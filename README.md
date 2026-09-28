@@ -28,6 +28,12 @@ server/   Express REST API — the only thing that talks to MongoDB
 
 Sidebar links for modules that are not built yet open a "Not built yet" page.
 
+### Student portal
+
+Students sign in to `/student`: dashboard, attendance, grades, subjects, schedule, announcements, finance, documents, notifications and profile, plus global search (Ctrl K) and a notification bell.
+
+Apart from sign-in and **Change password** (real API calls), the portal runs on **mock data** in `client/src/mocks/student/`, accessed only through `client/src/services/student.service.js`. Replacing that service's functions with API calls is all it takes to connect a real backend. Changes a student makes (profile edits, document requests, read notifications, photo) are kept in the browser's `localStorage`. Downloadable documents are generated PDFs marked as samples.
+
 ## Getting started
 
 ### 1. Configure the server
@@ -46,6 +52,7 @@ Then fill in:
 | `JWT_SECRET`              | 32+ random characters: `node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"` |
 | `SEED_ADMIN_PASSWORD`     | Password for the first admin account (8–72 chars, a letter and a number)          |
 | `SEED_TEACHER_PASSWORD`   | Optional demo teacher account; leave empty to skip                                |
+| `SEED_STUDENT_PASSWORD`   | Optional demo student (Juan Dela Cruz, `SEED_STUDENT_EMAIL`); leave empty to skip |
 
 In Atlas, also allow your IP under **Network Access**.
 
@@ -129,6 +136,7 @@ Authenticated requests send `Authorization: Bearer <token>`.
 | POST   | `/api/auth/login`    | Public        | `{ email, password }` → `{ user, token }`. Rate limited to 10 failed attempts / 15 min |
 | GET    | `/api/auth/me`       | Signed in     | Current user                                           |
 | POST   | `/api/auth/logout`   | Signed in     | Records the sign-out; the client discards the token    |
+| POST   | `/api/auth/change-password` | Signed in | `{ currentPassword, newPassword }`. Shares the login rate limit |
 | POST   | `/api/auth/register` | Admin only    | Create an account `{ firstName, lastName, email, password, role?, status? }` |
 
 ### Authentication and authorization
@@ -137,7 +145,7 @@ Authenticated requests send `Authorization: Bearer <token>`.
 - `authenticateUser` verifies the JWT **and reloads the user on every request**, so deactivating an account or changing its role takes effect immediately.
 - `requireRole('admin')` / `requireRole('teacher')` guards routes on the server. The React route guards are only for UX.
 - Login returns the same error for an unknown email and a wrong password, and takes the same time for both.
-- Only `admin` and `teacher` accounts can sign in. `student` accounts are records only for now.
+- `admin`, `teacher` and `student` accounts each sign in to their own portal; the others are off-limits.
 - There is no public sign-up. Administrators create accounts.
 
 ### Security already in place

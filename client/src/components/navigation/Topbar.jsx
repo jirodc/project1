@@ -1,27 +1,44 @@
-import { LogOut, Menu } from 'lucide-react';
-import { useState } from 'react';
-import toast from 'react-hot-toast';
-import { useNavigate } from 'react-router-dom';
+import { Menu } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth.js';
 import { ROLE_LABELS } from '../../utils/roles.js';
-import Spinner from '../common/Spinner.jsx';
 
 const initials = (user) => `${user.firstName?.[0] ?? ''}${user.lastName?.[0] ?? ''}`.toUpperCase();
 
-export default function Topbar({ onMenuClick }) {
-  const { user, logout } = useAuth();
-  const navigate = useNavigate();
-  const [isSigningOut, setIsSigningOut] = useState(false);
+function Avatar({ user, avatarUrl }) {
+  if (avatarUrl) {
+    return <img src={avatarUrl} alt="" className="size-9 rounded-full object-cover ring-1 ring-slate-200" />;
+  }
+  return (
+    <span
+      className="flex size-9 items-center justify-center rounded-full bg-indigo-100 text-sm font-semibold text-indigo-700"
+      aria-hidden="true"
+    >
+      {initials(user)}
+    </span>
+  );
+}
 
-  const handleLogout = async () => {
-    setIsSigningOut(true);
-    await logout();
-    toast.success('You have been signed out.');
-    navigate('/login', { replace: true });
-  };
+/**
+ * `leading` renders next to the menu button (e.g. search) and `trailing`
+ * before the user (e.g. notifications). With `profilePath`, the user block
+ * links to the profile page.
+ */
+export default function Topbar({ onMenuClick, leading, trailing, avatarUrl, profilePath }) {
+  const { user } = useAuth();
+
+  const userBlock = (
+    <>
+      <div className="hidden text-right sm:block">
+        <p className="text-sm font-medium text-slate-900">{user.name}</p>
+        <p className="text-xs text-slate-600">{ROLE_LABELS[user.role]}</p>
+      </div>
+      <Avatar user={user} avatarUrl={avatarUrl} />
+    </>
+  );
 
   return (
-    <header className="sticky top-0 z-20 flex h-16 items-center gap-4 border-b border-slate-200 bg-white/90 px-4 backdrop-blur sm:px-6 lg:px-8">
+    <header className="sticky top-0 z-20 flex h-16 items-center gap-3 border-b border-slate-200 bg-white px-4 sm:px-6 lg:px-8">
       <button
         type="button"
         onClick={onMenuClick}
@@ -31,27 +48,21 @@ export default function Topbar({ onMenuClick }) {
         <Menu className="size-5" />
       </button>
 
-      <div className="ml-auto flex items-center gap-3">
-        <div className="hidden text-right sm:block">
-          <p className="text-sm font-medium text-slate-900">{user.name}</p>
-          <p className="text-xs text-slate-500">{ROLE_LABELS[user.role]}</p>
-        </div>
-        <span
-          className="flex size-9 items-center justify-center rounded-full bg-indigo-100 text-sm font-semibold text-indigo-700"
-          aria-hidden="true"
-        >
-          {initials(user)}
-        </span>
-        <button
-          type="button"
-          onClick={handleLogout}
-          disabled={isSigningOut}
-          className="inline-flex items-center gap-2 rounded-lg px-2.5 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 disabled:opacity-60"
-        >
-          {isSigningOut ? <Spinner className="size-4" /> : <LogOut className="size-4" aria-hidden="true" />}
-          <span className="hidden sm:inline">Logout</span>
-          <span className="sr-only sm:hidden">Logout</span>
-        </button>
+      {leading && <div className="min-w-0 flex-1">{leading}</div>}
+
+      <div className="ml-auto flex items-center gap-2 sm:gap-3">
+        {trailing}
+        {profilePath ? (
+          <Link
+            to={profilePath}
+            className="flex items-center gap-3 rounded-lg p-1 hover:bg-slate-100"
+            aria-label="Your profile"
+          >
+            {userBlock}
+          </Link>
+        ) : (
+          <div className="flex items-center gap-3">{userBlock}</div>
+        )}
       </div>
     </header>
   );

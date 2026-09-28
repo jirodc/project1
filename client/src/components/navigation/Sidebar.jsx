@@ -1,12 +1,21 @@
-import { GraduationCap, X } from 'lucide-react';
+import { GraduationCap, LogOut, X } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
+import { useLogout } from '../../hooks/useLogout.js';
+import Spinner from '../common/Spinner.jsx';
 
 const linkClass = ({ isActive }) =>
-  `group flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition ${
-    isActive ? 'bg-slate-800 text-white' : 'text-slate-400 hover:bg-slate-800/60 hover:text-white'
+  `group relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition ${
+    isActive
+      ? 'bg-slate-800 text-white before:absolute before:inset-y-1.5 before:left-0 before:w-1 before:rounded-full before:bg-indigo-400'
+      : 'text-slate-300 hover:bg-slate-800/70 hover:text-white'
   }`;
 
-export default function Sidebar({ navigation, portalName, open, onClose }) {
+/**
+ * `badges` maps a nav item's `to` to a count shown beside it (e.g. unread notifications).
+ */
+export default function Sidebar({ navigation, portalName, open, onClose, badges = {} }) {
+  const { signOut, isSigningOut } = useLogout();
+
   return (
     <>
       {/* Backdrop for the mobile drawer */}
@@ -31,13 +40,13 @@ export default function Sidebar({ navigation, portalName, open, onClose }) {
             </span>
             <div className="leading-tight">
               <p className="text-sm font-semibold text-white">Classroom Manager</p>
-              <p className="text-xs text-slate-400">{portalName}</p>
+              <p className="text-xs text-slate-300">{portalName}</p>
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-md p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white lg:hidden"
+            className="rounded-md p-1.5 text-slate-300 hover:bg-slate-800 hover:text-white lg:hidden"
             aria-label="Close navigation"
           >
             <X className="size-5" />
@@ -48,7 +57,7 @@ export default function Sidebar({ navigation, portalName, open, onClose }) {
           {navigation.map((section, index) => (
             <div key={section.heading ?? index}>
               {section.heading && (
-                <p className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                <p className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-slate-400">
                   {section.heading}
                 </p>
               )}
@@ -58,8 +67,14 @@ export default function Sidebar({ navigation, portalName, open, onClose }) {
                     <NavLink to={to} end={end} className={linkClass} onClick={onClose}>
                       <Icon className="size-4.5 shrink-0" aria-hidden="true" />
                       <span className="flex-1">{label}</span>
+                      {badges[to] > 0 && (
+                        <span className="rounded-full bg-indigo-500 px-1.5 py-0.5 text-[11px] font-semibold leading-none text-white tabular-nums">
+                          {badges[to]}
+                          <span className="sr-only"> unread</span>
+                        </span>
+                      )}
                       {phase && (
-                        <span className="rounded bg-slate-800 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-slate-500 group-hover:bg-slate-700">
+                        <span className="rounded bg-slate-800 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-slate-300 group-hover:bg-slate-700">
                           Soon
                         </span>
                       )}
@@ -70,6 +85,18 @@ export default function Sidebar({ navigation, portalName, open, onClose }) {
             </div>
           ))}
         </nav>
+
+        <div className="shrink-0 border-t border-slate-800 p-3">
+          <button
+            type="button"
+            onClick={signOut}
+            disabled={isSigningOut}
+            className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-slate-300 transition hover:bg-slate-800/70 hover:text-white disabled:opacity-60"
+          >
+            {isSigningOut ? <Spinner className="size-4.5" /> : <LogOut className="size-4.5" aria-hidden="true" />}
+            Logout
+          </button>
+        </div>
       </aside>
     </>
   );

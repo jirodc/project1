@@ -1,6 +1,7 @@
 export const ROLES = {
   ADMIN: 'admin',
   TEACHER: 'teacher',
+  STUDENT: 'student',
 };
 
 export const ROLE_LABELS = {
@@ -9,4 +10,10 @@ export const ROLE_LABELS = {
   student: 'Student',
 };
 
-export const homePathFor = (role) => (role === ROLES.ADMIN ? '/admin' : '/teacher');
+const HOME_PATHS = {
+  admin: '/admin',
+  teacher: '/teacher',
+  student: '/student',
+};
+
+export const homePathFor = (role) => HOME_PATHS[role] ?? '/login';

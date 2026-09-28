@@ -1,5 +1,7 @@
 import {
+  Bell,
   BookOpen,
+  FileText,
   CalendarDays,
   ChartColumn,
   CircleUser,
@@ -64,6 +66,23 @@ export const teacherNavigation = [
       { label: 'Schedule', to: '/teacher/schedule', icon: CalendarDays, phase: 4 },
       { label: 'Salary', to: '/teacher/salary', icon: Wallet, phase: 5 },
       { label: 'Profile', to: '/teacher/profile', icon: CircleUser },
+    ],
+  },
+];
+
+export const studentNavigation = [
+  {
+    items: [
+      { label: 'Dashboard', to: '/student', icon: LayoutDashboard, end: true },
+      { label: 'Attendance', to: '/student/attendance', icon: ClipboardCheck },
+      { label: 'Grades', to: '/student/grades', icon: ChartColumn },
+      { label: 'Subjects', to: '/student/subjects', icon: BookOpen },
+      { label: 'Schedule', to: '/student/schedule', icon: CalendarDays },
+      { label: 'Announcements', to: '/student/announcements', icon: Megaphone },
+      { label: 'Finance', to: '/student/finance', icon: Wallet },
+      { label: 'Documents', to: '/student/documents', icon: FileText },
+      { label: 'Notifications', to: '/student/notifications', icon: Bell },
+      { label: 'Profile', to: '/student/profile', icon: CircleUser },
     ],
   },
 ];
