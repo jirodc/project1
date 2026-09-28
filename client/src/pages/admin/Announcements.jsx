@@ -10,10 +10,13 @@ import Button from '../../components/common/Button.jsx';
 import ConfirmDialog from '../../components/common/ConfirmDialog.jsx';
 import Modal from '../../components/common/Modal.jsx';
 import PageHeader from '../../components/common/PageHeader.jsx';
+import Pagination from '../../components/common/Pagination.jsx';
 import Spinner from '../../components/common/Spinner.jsx';
 import TextField, { TextAreaField } from '../../components/common/TextField.jsx';
+import { useAnnouncements } from '../../hooks/useAnnouncements.js';
 import { announcementService } from '../../services/announcement.service.js';
 import { getErrorMessage } from '../../utils/errors.js';
+import { formatDateTime } from '../../utils/format.js';
 
 // Keep in sync with ANNOUNCEMENT_LIMITS in server/src/models/Announcement.js.
 const LIMITS = { title: 120, body: 2000, type: 30 };
@@ -31,15 +34,11 @@ const announcementSchema = z.object({
 
 const EMPTY_FORM = { title: '', body: '', type: '' };
 
-const dateFormat = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' });
-
 export default function Announcements() {
   const location = useLocation();
   const navigate = useNavigate();
 
-  const [page, setPage] = useState(1);
-  const [reloadKey, setReloadKey] = useState(0);
-  const [list, setList] = useState({ status: 'loading', items: [], pagination: null, error: '' });
+  const list = useAnnouncements(PAGE_SIZE);
 
   // The dashboard's "Create announcement" button links here with this flag.
   const [isFormOpen, setIsFormOpen] = useState(Boolean(location.state?.openCreate));
@@ -60,31 +59,6 @@ export default function Announcements() {
     if (location.state?.openCreate) navigate(location.pathname, { replace: true, state: null });
   }, [location, navigate]);
 
-  useEffect(() => {
-    let cancelled = false;
-    setList((current) => ({ ...current, status: 'loading' }));
-
-    announcementService
-      .list({ page, limit: PAGE_SIZE })
-      .then(({ items, pagination }) => {
-        if (!cancelled) setList({ status: 'ready', items, pagination, error: '' });
-      })
-      .catch((error) => {
-        if (!cancelled) {
-          setList({
-            status: 'error',
-            items: [],
-            pagination: null,
-            error: getErrorMessage(error, 'Unable to load announcements.'),
-          });
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [page, reloadKey]);
-
   const openForm = () => setIsFormOpen(true);
 
   const closeForm = () => {
@@ -99,8 +73,9 @@ export default function Announcements() {
       setPendingAnnouncement(null);
       setIsFormOpen(false);
       reset(EMPTY_FORM);
-      if (page === 1) setReloadKey((key) => key + 1);
-      else setPage(1);
+      // Show the new announcement, which is always first on page 1.
+      if (list.page === 1) list.reload();
+      else list.setPage(1);
     } catch (error) {
       // Keep the form open with the admin's text so they can fix and retry.
       setPendingAnnouncement(null);
@@ -123,12 +98,7 @@ export default function Announcements() {
         }
       />
 
-      <AnnouncementList
-        list={list}
-        onRetry={() => setReloadKey((key) => key + 1)}
-        onCreate={openForm}
-        onPageChange={setPage}
-      />
+      <AnnouncementList list={list} onRetry={list.reload} onCreate={openForm} onPageChange={list.setPage} />
 
       <Modal
         open={isFormOpen}
@@ -245,9 +215,6 @@ function AnnouncementList({ list, onRetry, onCreate, onPageChange }) {
     );
   }
 
-  const first = (pagination.page - 1) * pagination.limit + 1;
-  const last = first + items.length - 1;
-
   return (
     <div className={`overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs transition-opacity ${status === 'loading' ? 'opacity-60' : ''}`}>
       <h2 className="border-b border-slate-200 px-5 py-3 text-sm font-semibold text-slate-900">
@@ -275,7 +242,7 @@ function AnnouncementList({ list, onRetry, onCreate, onPageChange }) {
                   </span>
                 </td>
                 <td className="whitespace-nowrap px-5 py-3.5 text-slate-600">
-                  <time dateTime={announcement.createdAt}>{dateFormat.format(new Date(announcement.createdAt))}</time>
+                  <time dateTime={announcement.createdAt}>{formatDateTime(announcement.createdAt)}</time>
                 </td>
               </tr>
             ))}
@@ -283,29 +250,13 @@ function AnnouncementList({ list, onRetry, onCreate, onPageChange }) {
         </table>
       </div>
 
-      <div className="flex flex-col gap-3 border-t border-slate-200 px-5 py-3 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between">
-        <p>
-          Showing {first}–{last} of {pagination.total}
-        </p>
-        <div className="flex gap-2">
-          <Button
-            variant="secondary"
-            className="px-3 py-1.5"
-            disabled={pagination.page <= 1 || status === 'loading'}
-            onClick={() => onPageChange(pagination.page - 1)}
-          >
-            Previous
-          </Button>
-          <Button
-            variant="secondary"
-            className="px-3 py-1.5"
-            disabled={pagination.page >= pagination.totalPages || status === 'loading'}
-            onClick={() => onPageChange(pagination.page + 1)}
-          >
-            Next
-          </Button>
-        </div>
-      </div>
+      <Pagination
+        className="border-t border-slate-200 px-5 py-3"
+        pagination={pagination}
+        itemCount={items.length}
+        disabled={status === 'loading'}
+        onPageChange={onPageChange}
+      />
     </div>
   );
 }

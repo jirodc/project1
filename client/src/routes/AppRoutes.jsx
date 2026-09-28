@@ -9,6 +9,7 @@ import Login from '../pages/auth/Login.jsx';
 import ComingSoon from '../pages/shared/ComingSoon.jsx';
 import NotFound from '../pages/shared/NotFound.jsx';
 import Profile from '../pages/shared/Profile.jsx';
+import TeacherAnnouncements from '../pages/teacher/Announcements.jsx';
 import TeacherDashboard from '../pages/teacher/Dashboard.jsx';
 import { homePathFor, ROLES } from '../utils/roles.js';
 import { GuestRoute, ProtectedRoute } from './ProtectedRoute.jsx';
@@ -70,6 +71,7 @@ export default function AppRoutes() {
         }
       >
         <Route index element={<TeacherDashboard />} />
+        <Route path="announcements" element={<TeacherAnnouncements />} />
         <Route path="profile" element={<Profile />} />
         {plannedRoutes(teacherNavigation)}
         <Route path="*" element={<Navigate to="/teacher" replace />} />

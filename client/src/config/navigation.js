@@ -56,6 +56,7 @@ export const teacherNavigation = [
   {
     items: [
       { label: 'Dashboard', to: '/teacher', icon: LayoutDashboard, end: true },
+      { label: 'Announcements', to: '/teacher/announcements', icon: Megaphone },
       { label: 'My Classrooms', to: '/teacher/classrooms', icon: School, phase: 4 },
       { label: 'Students', to: '/teacher/students', icon: GraduationCap, phase: 4 },
       { label: 'Assessments', to: '/teacher/assessments', icon: ClipboardCheck, phase: 4 },
