@@ -1,5 +1,5 @@
 /**
- * Creates the first administrator (and optionally a demo teacher) so there is
+ * Creates the first administrator (and optionally a demo teacher and student) so there is
  * someone who can sign in. Existing accounts are left untouched.
  *
  *   npm run seed
@@ -24,6 +24,14 @@ const accounts = [
     firstName: 'Demo',
     lastName: 'Teacher',
     role: 'teacher',
+    required: false,
+  },
+  {
+    email: process.env.SEED_STUDENT_EMAIL,
+    password: process.env.SEED_STUDENT_PASSWORD,
+    firstName: 'Juan',
+    lastName: 'Dela Cruz',
+    role: 'student',
     required: false,
   },
 ];

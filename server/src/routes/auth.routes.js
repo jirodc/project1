@@ -1,10 +1,10 @@
 import { Router } from 'express';
-import { login, logout, me, register } from '../controllers/auth.controller.js';
+import { changePassword, login, logout, me, register } from '../controllers/auth.controller.js';
 import { authenticateUser } from '../middleware/auth.middleware.js';
 import { loginLimiter } from '../middleware/rateLimit.middleware.js';
 import { requireRole } from '../middleware/role.middleware.js';
 import { validate } from '../middleware/validation.middleware.js';
-import { loginSchema, registerSchema } from '../validators/auth.validators.js';
+import { changePasswordSchema, loginSchema, registerSchema } from '../validators/auth.validators.js';
 
 const router = Router();
 
@@ -21,5 +21,14 @@ router.post(
 
 router.get('/me', authenticateUser, me);
 router.post('/logout', authenticateUser, logout);
+
+// Shares the login limiter so a stolen session cannot brute-force the current password.
+router.post(
+  '/change-password',
+  authenticateUser,
+  loginLimiter,
+  validate({ body: changePasswordSchema }),
+  changePassword,
+);
 
 export default router;

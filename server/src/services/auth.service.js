@@ -4,8 +4,8 @@ import { AppError } from '../utils/AppError.js';
 import { signToken } from '../utils/jwt.js';
 import { comparePassword, hashPassword } from '../utils/password.js';
 
-/** Roles that have a portal to sign in to. Students are records only for now. */
-const PORTAL_ROLES = ['admin', 'teacher'];
+/** Roles that have a portal to sign in to. */
+const PORTAL_ROLES = ['admin', 'teacher', 'student'];
 
 const INVALID_CREDENTIALS = 'Invalid email or password';
 
@@ -37,7 +37,7 @@ export async function login({ email, password }, { ipAddress } = {}) {
     throw new AppError(403, 'Your account is not active. Please contact an administrator.');
   }
   if (!PORTAL_ROLES.includes(user.role)) {
-    throw new AppError(403, 'Student accounts do not have portal access yet.');
+    throw new AppError(403, 'This account does not have portal access.');
   }
 
   await User.updateOne({ _id: user._id }, { lastLoginAt: new Date() });
@@ -69,6 +69,29 @@ export async function register(data, { actor, ipAddress } = {}) {
   });
 
   return toAuthUser(user);
+}
+
+export async function changePassword(user, { currentPassword, newPassword }, { ipAddress } = {}) {
+  const account = await User.findById(user._id).select('+password');
+
+  if (!(await comparePassword(currentPassword, account.password))) {
+    throw new AppError(400, 'Validation failed', {
+      error: 'Current password is incorrect',
+      details: [{ field: 'currentPassword', message: 'Current password is incorrect' }],
+    });
+  }
+
+  account.password = newPassword; // hashed by the model's pre-save hook
+  await account.save();
+
+  await logActivity({
+    actorId: user._id,
+    action: 'auth.password_changed',
+    entityType: 'User',
+    entityId: user._id,
+    description: `${user.fullName} changed their password`,
+    ipAddress,
+  });
 }
 
 export async function logout(user, { ipAddress } = {}) {

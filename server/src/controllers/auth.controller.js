@@ -15,6 +15,11 @@ export function me(req, res) {
   sendSuccess(res, { data: { user: authService.toAuthUser(req.user) } });
 }
 
+export async function changePassword(req, res) {
+  await authService.changePassword(req.user, req.body, { ipAddress: req.ip });
+  sendSuccess(res, { message: 'Password changed successfully' });
+}
+
 /**
  * JWTs are stateless, so the client discards its token. The server records the
  * sign-out; deactivating an account revokes its tokens on the next request.

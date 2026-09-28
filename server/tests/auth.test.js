@@ -71,10 +71,11 @@ describe('POST /api/auth/login', () => {
     });
   }
 
-  it('rejects student accounts, which have no portal', async () => {
+  it('lets students sign in to the student portal', async () => {
     const user = await createUser({ role: 'student' });
     const res = await login(user.email);
-    assert.equal(res.status, 403);
+    assert.equal(res.status, 200);
+    assert.equal(res.body.data.user.role, 'student');
   });
 
   it('returns field-level validation errors', async () => {
@@ -194,6 +195,53 @@ describe('POST /api/auth/register (RBAC)', () => {
 
     assert.equal(res.status, 400);
     assert.ok(res.body.details.some((d) => d.field === 'password'));
+  });
+});
+
+describe('POST /api/auth/change-password', () => {
+  const changePassword = (token, body) =>
+    request(app).post('/api/auth/change-password').set('Authorization', `Bearer ${token}`).send(body);
+
+  it('changes the password so only the new one works', async () => {
+    const user = await createUser({ role: 'student' });
+    const token = await tokenFor(user);
+
+    const res = await changePassword(token, { currentPassword: TEST_PASSWORD, newPassword: 'NewSecret456' });
+
+    assert.equal(res.status, 200);
+    assert.equal((await login(user.email)).status, 401);
+    assert.equal((await login(user.email, 'NewSecret456')).status, 200);
+    assert.ok(await ActivityLog.exists({ action: 'auth.password_changed', actorId: user._id }));
+  });
+
+  it('rejects a wrong current password', async () => {
+    const user = await createUser();
+    const token = await tokenFor(user);
+
+    const res = await changePassword(token, { currentPassword: 'WrongPassword1', newPassword: 'NewSecret456' });
+
+    assert.equal(res.status, 400);
+    assert.deepEqual(res.body.details, [{ field: 'currentPassword', message: 'Current password is incorrect' }]);
+    assert.equal((await login(user.email)).status, 200);
+  });
+
+  it('enforces the password policy and requires a different password', async () => {
+    const user = await createUser();
+    const token = await tokenFor(user);
+
+    const weak = await changePassword(token, { currentPassword: TEST_PASSWORD, newPassword: 'short' });
+    const same = await changePassword(token, { currentPassword: TEST_PASSWORD, newPassword: TEST_PASSWORD });
+
+    assert.equal(weak.status, 400);
+    assert.equal(same.status, 400);
+    assert.ok(same.body.details.some((d) => d.field === 'newPassword'));
+  });
+
+  it('requires authentication', async () => {
+    const res = await request(app)
+      .post('/api/auth/change-password')
+      .send({ currentPassword: TEST_PASSWORD, newPassword: 'NewSecret456' });
+    assert.equal(res.status, 401);
   });
 });
 

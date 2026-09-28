@@ -19,6 +19,16 @@ export const loginSchema = z.object({
   password: z.string().min(1, 'Password is required').max(128),
 });
 
+export const changePasswordSchema = z
+  .object({
+    currentPassword: z.string().min(1, 'Current password is required').max(128),
+    newPassword: passwordSchema,
+  })
+  .refine((data) => data.currentPassword !== data.newPassword, {
+    message: 'New password must be different from the current one',
+    path: ['newPassword'],
+  });
+
 export const registerSchema = z.object({
   firstName: name('First name'),
   lastName: name('Last name'),
