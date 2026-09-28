@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import mongoose from 'mongoose';
 import { sendSuccess } from '../utils/apiResponse.js';
+import announcementRoutes from './announcement.routes.js';
 import authRoutes from './auth.routes.js';
 
 const router = Router();
@@ -20,5 +21,6 @@ router.get('/health', (_req, res) => {
 });
 
 router.use('/auth', authRoutes);
+router.use('/announcements', announcementRoutes);
 
 export default router;

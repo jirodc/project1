@@ -3,6 +3,7 @@ import { adminNavigation, navigationItems, teacherNavigation } from '../config/n
 import { useAuth } from '../hooks/useAuth.js';
 import AdminLayout from '../layouts/AdminLayout.jsx';
 import TeacherLayout from '../layouts/TeacherLayout.jsx';
+import Announcements from '../pages/admin/Announcements.jsx';
 import AdminDashboard from '../pages/admin/Dashboard.jsx';
 import Login from '../pages/auth/Login.jsx';
 import ComingSoon from '../pages/shared/ComingSoon.jsx';
@@ -55,6 +56,7 @@ export default function AppRoutes() {
         }
       >
         <Route index element={<AdminDashboard />} />
+        <Route path="announcements" element={<Announcements />} />
         {plannedRoutes(adminNavigation)}
         <Route path="*" element={<Navigate to="/admin" replace />} />
       </Route>

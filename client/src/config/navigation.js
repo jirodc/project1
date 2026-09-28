@@ -7,6 +7,7 @@ import {
   GraduationCap,
   History,
   LayoutDashboard,
+  Megaphone,
   School,
   Settings,
   Target,
@@ -42,6 +43,7 @@ export const adminNavigation = [
   {
     heading: 'Operations',
     items: [
+      { label: 'Announcements', to: '/admin/announcements', icon: Megaphone },
       { label: 'Schedules', to: '/admin/schedules', icon: CalendarDays, phase: 4 },
       { label: 'Salaries', to: '/admin/salaries', icon: Wallet, phase: 5 },
       { label: 'Activity Logs', to: '/admin/activity-logs', icon: History, phase: 3 },
