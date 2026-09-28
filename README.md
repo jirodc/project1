@@ -24,7 +24,7 @@ server/   Express REST API — the only thing that talks to MongoDB
 | 5     | Salary configuration and calculation                          | Not started |
 | 6     | Security hardening                                            | Partly done (see below) |
 | 7     | Testing                                                       | Auth covered |
-| 8     | Deployment                                                    | Not started |
+| 8     | Deployment                                                    | Configured (GitHub Pages + Render) |
 
 Sidebar links for modules that are not built yet open a "Not built yet" page.
 
@@ -76,6 +76,34 @@ npm test
 ```
 
 Tests use an in-memory MongoDB (`mongodb-memory-server`), so they never touch Atlas. The first run downloads a MongoDB binary.
+
+## Deployment
+
+| Part   | Host                     | URL                                   |
+| ------ | ------------------------ | ------------------------------------- |
+| Client | GitHub Pages (free)      | https://jirodc.github.io/project1/    |
+| API    | Render free web service  | `https://<service-name>.onrender.com` |
+| DB     | MongoDB Atlas            | —                                     |
+
+GitHub Pages only serves static files, so the API runs on Render.
+
+### API on Render (one time)
+
+1. In [Render](https://render.com): **New → Blueprint**, connect this repository. `render.yaml` defines the service.
+2. When prompted, enter `MONGODB_URI` (the same Atlas string as `server/.env`). `JWT_SECRET` is generated automatically.
+3. In Atlas → **Network Access**, allow `0.0.0.0/0`. Render's free tier has no fixed outgoing IP.
+4. Once deployed, open `https://<service-name>.onrender.com/api/health` and check it says `"database":"connected"`.
+
+Free Render services sleep after 15 minutes idle, so the first request after that can take up to a minute.
+
+### Client on GitHub Pages (one time)
+
+1. The repository must be **public** for free GitHub Pages.
+2. **Settings → Pages → Build and deployment → Source: GitHub Actions.**
+3. **Settings → Secrets and variables → Actions → Variables → New repository variable:** `VITE_API_URL` = `https://<service-name>.onrender.com/api`.
+4. **Actions → Deploy client to GitHub Pages → Run workflow.**
+
+After that, every push to `main` that changes `client/` redeploys the site (`.github/workflows/deploy-client.yml`).
 
 ## Environment variables
 

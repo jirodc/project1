@@ -3,7 +3,8 @@ import { tokenStorage } from '../utils/tokenStorage.js';
 
 export const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL ?? 'http://localhost:5050/api',
-  timeout: 15_000,
+  // Free API hosting sleeps when idle and can take close to a minute to wake up.
+  timeout: 60_000,
 });
 
 api.interceptors.request.use((config) => {
