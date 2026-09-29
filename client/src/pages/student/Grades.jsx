@@ -10,9 +10,7 @@ import GwaTrendChart from '../../components/student/GwaTrendChart.jsx';
 import StatusBadge from '../../components/student/StatusBadges.jsx';
 import { useStudentData } from '../../hooks/useStudentData.js';
 import { getGrades } from '../../services/student.service.js';
-
-const SEMESTERS = ['1st Semester', '2nd Semester'];
-const dash = (value) => (value == null ? '—' : value);
+import { formatGrade, SEMESTERS } from '../../utils/academic.js';
 
 export default function StudentGrades() {
   const query = useStudentData(getGrades);
@@ -21,7 +19,17 @@ export default function StudentGrades() {
     <>
       <PageHeader title="Grades" description="Your grades per semester and overall academic standing." />
       <QueryState query={query} loadingLabel="Loading grades…">
-        {(data) => <GradesContent data={data} />}
+        {(data) =>
+          data.terms.length === 0 ? (
+            <EmptyState
+              icon={GraduationCap}
+              title="No grades yet"
+              description="Your grades appear here once you're enrolled in a class and your teachers start recording scores."
+            />
+          ) : (
+            <GradesContent data={data} />
+          )
+        }
       </QueryState>
     </>
   );
@@ -50,7 +58,13 @@ function GradesContent({ data }) {
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-5">
-        <StatCard label="Current GPA" value={summary.currentGpa.toFixed(2)} hint="Cumulative GWA" icon={GraduationCap} tone="indigo" />
+        <StatCard
+          label="Current GPA"
+          value={summary.currentGpa?.toFixed(2) ?? '—'}
+          hint={summary.currentGpa == null ? 'After your first full semester' : 'Cumulative GWA'}
+          icon={GraduationCap}
+          tone="indigo"
+        />
         <StatCard
           label="Previous GPA"
           value={summary.previousGpa?.toFixed(2) ?? '—'}
@@ -114,9 +128,9 @@ function GradesContent({ data }) {
                     <Td className="whitespace-nowrap font-medium text-slate-900">{row.code}</Td>
                     <Td className="min-w-56">{row.name}</Td>
                     <Td align="center">{row.units}</Td>
-                    <Td align="center">{dash(row.prelim)}</Td>
-                    <Td align="center">{dash(row.midterm)}</Td>
-                    <Td align="center">{dash(row.final)}</Td>
+                    <Td align="center">{formatGrade(row.prelim)}</Td>
+                    <Td align="center">{formatGrade(row.midterm)}</Td>
+                    <Td align="center">{formatGrade(row.final)}</Td>
                     <Td align="center" className="whitespace-nowrap font-semibold text-slate-900">
                       {row.rating == null ? '—' : `${row.rating} (${row.point.toFixed(2)})`}
                     </Td>
@@ -159,8 +173,13 @@ function GradesContent({ data }) {
           <CardBody>
             <p className="flex gap-2 text-sm text-slate-700">
               <Info className="mt-0.5 size-4 shrink-0 text-indigo-600" aria-hidden="true" />
-              Final rating = Prelim {data.weights.prelim * 100}% + Midterm {data.weights.midterm * 100}% + Final{' '}
-              {data.weights.final * 100}%
+              <span>
+                Final rating = Prelim {data.weights.prelim}% + Midterm {data.weights.midterm}% + Final {data.weights.final}%
+                <span className="mt-1 block text-xs text-slate-600">
+                  These are the usual weights; some subjects set their own. Period grades combine quizzes, assignments,
+                  projects, and exams using each subject's weights.
+                </span>
+              </span>
             </p>
             <table className="mt-4 w-full text-sm">
               <caption className="sr-only">Grading scale</caption>

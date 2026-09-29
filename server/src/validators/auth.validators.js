@@ -1,18 +1,8 @@
 import { z } from 'zod';
 import { USER_ROLES, USER_STATUSES } from '../models/User.js';
+import { email, passwordSchema, personName } from './common.js';
 
-const email = z.string().trim().toLowerCase().pipe(z.email('Enter a valid email address'));
-
-const name = (label) =>
-  z.string().trim().min(1, `${label} is required`).max(50, `${label} must be at most 50 characters`);
-
-// bcrypt only uses the first 72 bytes of a password, so longer ones are rejected.
-export const passwordSchema = z
-  .string()
-  .min(8, 'Password must be at least 8 characters')
-  .max(72, 'Password must be at most 72 characters')
-  .regex(/[A-Za-z]/, 'Password must contain a letter')
-  .regex(/\d/, 'Password must contain a number');
+export { passwordSchema };
 
 export const loginSchema = z.object({
   email,
@@ -30,8 +20,8 @@ export const changePasswordSchema = z
   });
 
 export const registerSchema = z.object({
-  firstName: name('First name'),
-  lastName: name('Last name'),
+  firstName: personName('First name'),
+  lastName: personName('Last name'),
   email,
   password: passwordSchema,
   role: z.enum(USER_ROLES).default('teacher'),

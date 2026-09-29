@@ -19,6 +19,7 @@ import { useAuth } from '../../hooks/useAuth.js';
 import { useStudentData } from '../../hooks/useStudentData.js';
 import { TODAY } from '../../mocks/student/calendar.js';
 import { getDashboard } from '../../services/student.service.js';
+import { formatGrade, GRADING_PERIODS, labelOf } from '../../utils/academic.js';
 import {
   formatCurrency,
   formatDate,
@@ -61,8 +62,8 @@ function DashboardContent({ data }) {
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-5">
         <StatCard
           label="Current GPA"
-          value={stats.gpa.toFixed(2)}
-          hint="Cumulative GWA"
+          value={stats.gpa?.toFixed(2) ?? '—'}
+          hint={stats.gpa == null ? 'After your first full semester' : 'Cumulative GWA'}
           icon={GraduationCap}
           tone="indigo"
           to="/student/grades"
@@ -197,18 +198,26 @@ function UpcomingEvents({ items }) {
 function RecentGrades({ grades }) {
   return (
     <Card>
-      <CardHeader title="Recent Grades" description="Prelim grades posted this semester" action={<CardLink to="/student/grades">All grades</CardLink>} />
-      <ul className="divide-y divide-slate-100">
-        {grades.map((grade) => (
-          <li key={grade.code} className="flex items-center gap-3 px-5 py-3">
-            <div className="min-w-0 flex-1">
-              <SubjectTag subject={grade.subject} link className="max-w-full text-sm" />
-              <p className="mt-0.5 text-xs text-slate-600">Prelim · posted {formatRelativeTime(grade.postedAt)}</p>
-            </div>
-            <p className="text-lg font-semibold tabular-nums text-slate-900">{grade.prelim}</p>
-          </li>
-        ))}
-      </ul>
+      <CardHeader title="Recent Grades" description="Latest grades from your teachers this semester" action={<CardLink to="/student/grades">All grades</CardLink>} />
+      {grades.length === 0 ? (
+        <div className="p-5">
+          <EmptyState icon={GraduationCap} title="No grades yet" description="Grades appear here as soon as your teachers record scores." />
+        </div>
+      ) : (
+        <ul className="divide-y divide-slate-100">
+          {grades.map((grade) => (
+            <li key={grade.code} className="flex items-center gap-3 px-5 py-3">
+              <div className="min-w-0 flex-1">
+                <SubjectTag subject={grade.subject} link className="max-w-full text-sm" />
+                <p className="mt-0.5 text-xs text-slate-600">
+                  {labelOf(GRADING_PERIODS, grade.latestPeriod)} · updated {formatRelativeTime(grade.postedAt)}
+                </p>
+              </div>
+              <p className="text-lg font-semibold tabular-nums text-slate-900">{formatGrade(grade.latestGrade)}</p>
+            </li>
+          ))}
+        </ul>
+      )}
     </Card>
   );
 }

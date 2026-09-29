@@ -5,7 +5,7 @@ import { studentStore } from '../mocks/student/store.js';
 const MOCK_LATENCY_MS = 300;
 
 /**
- * Runs a synchronous student-data selector and returns
+ * Runs a student-data selector (sync for mock data, async for API data) and returns
  * `{ status, data, error, reload }`. Recomputes silently whenever the student
  * store changes (e.g. a notification is marked as read).
  */
@@ -16,12 +16,14 @@ export function useStudentData(selector, deps = []) {
   useEffect(() => {
     let cancelled = false;
 
-    const compute = () => {
+    // Selectors may be synchronous (mock data) or return a promise (API data).
+    const compute = async () => {
       if (cancelled) return;
       try {
-        setState({ status: 'ready', data: selector(), error: null });
+        const data = await selector();
+        if (!cancelled) setState({ status: 'ready', data, error: null });
       } catch (error) {
-        setState({ status: 'error', data: undefined, error });
+        if (!cancelled) setState({ status: 'error', data: undefined, error });
       }
     };
 

@@ -11,8 +11,13 @@ import { homePathFor, ROLES } from '../utils/roles.js';
 import { GuestRoute, ProtectedRoute } from './ProtectedRoute.jsx';
 
 // Pages load on first visit, so each portal only downloads its own code.
+const ActivityLogs = lazy(() => import('../pages/admin/ActivityLogs.jsx'));
 const Announcements = lazy(() => import('../pages/admin/Announcements.jsx'));
+const AdminClassrooms = lazy(() => import('../pages/admin/Classrooms.jsx'));
 const AdminDashboard = lazy(() => import('../pages/admin/Dashboard.jsx'));
+const AdminStudents = lazy(() => import('../pages/admin/Students.jsx'));
+const AdminSubjects = lazy(() => import('../pages/admin/Subjects.jsx'));
+const Users = lazy(() => import('../pages/admin/Users.jsx'));
 const ComingSoon = lazy(() => import('../pages/shared/ComingSoon.jsx'));
 const Profile = lazy(() => import('../pages/shared/Profile.jsx'));
 const AnnouncementDetail = lazy(() => import('../pages/student/AnnouncementDetail.jsx'));
@@ -28,7 +33,11 @@ const StudentSchedule = lazy(() => import('../pages/student/Schedule.jsx'));
 const SubjectDetail = lazy(() => import('../pages/student/SubjectDetail.jsx'));
 const StudentSubjects = lazy(() => import('../pages/student/Subjects.jsx'));
 const TeacherAnnouncements = lazy(() => import('../pages/teacher/Announcements.jsx'));
+const TeacherClassroomDetail = lazy(() => import('../pages/teacher/ClassroomDetail.jsx'));
+const TeacherClassrooms = lazy(() => import('../pages/teacher/Classrooms.jsx'));
 const TeacherDashboard = lazy(() => import('../pages/teacher/Dashboard.jsx'));
+const TeacherScores = lazy(() => import('../pages/teacher/Scores.jsx'));
+const TeacherStudents = lazy(() => import('../pages/teacher/Students.jsx'));
 
 /** Placeholder routes for sidebar modules that have not been built yet. */
 const plannedRoutes = (sections) =>
@@ -74,6 +83,13 @@ export default function AppRoutes() {
       >
         <Route index element={<AdminDashboard />} />
         <Route path="announcements" element={<Announcements />} />
+        {/* Distinct keys so switching between these two resets filters. */}
+        <Route path="users" element={<Users key="users" />} />
+        <Route path="teachers" element={<Users key="teachers" role="teacher" />} />
+        <Route path="students" element={<AdminStudents />} />
+        <Route path="subjects" element={<AdminSubjects />} />
+        <Route path="classrooms" element={<AdminClassrooms />} />
+        <Route path="activity-logs" element={<ActivityLogs />} />
         {plannedRoutes(adminNavigation)}
         <Route path="*" element={<Navigate to="/admin" replace />} />
       </Route>
@@ -88,6 +104,10 @@ export default function AppRoutes() {
       >
         <Route index element={<TeacherDashboard />} />
         <Route path="announcements" element={<TeacherAnnouncements />} />
+        <Route path="classrooms" element={<TeacherClassrooms />} />
+        <Route path="classrooms/:id" element={<TeacherClassroomDetail />} />
+        <Route path="students" element={<TeacherStudents />} />
+        <Route path="scores" element={<TeacherScores />} />
         <Route path="profile" element={<Profile />} />
         {plannedRoutes(teacherNavigation)}
         <Route path="*" element={<Navigate to="/teacher" replace />} />

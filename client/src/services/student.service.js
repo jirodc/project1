@@ -1,22 +1,25 @@
 /**
- * Student portal data access. Reads are synchronous selectors over the mock
- * data (see hooks/useStudentData.js for loading behavior); writes are async
- * like real API calls. Swap these implementations for API requests when the
- * backend endpoints exist — the pages only depend on this module.
+ * Student portal data access. Grades come from the API; the other sections
+ * still read mock data (see hooks/useStudentData.js for loading behavior),
+ * with async writes like real API calls. Replace the mock-backed functions
+ * with API requests as those endpoints are built — pages only depend on this module.
  */
 import { buildAttendanceRecords, summarizeAttendance } from '../mocks/student/attendance.js';
 import { announcements } from '../mocks/student/announcements.js';
-import { CURRENT_TERM, TODAY, daysFromToday } from '../mocks/student/calendar.js';
+import { TODAY, daysFromToday } from '../mocks/student/calendar.js';
 import { documentCatalog, documentPurposes } from '../mocks/student/documents.js';
 import { events } from '../mocks/student/events.js';
 import { assessment, installments, paymentChannels, payments } from '../mocks/student/finance.js';
-import { GRADE_WEIGHTS, GRADING_SCALE, prelimPostedAt, terms } from '../mocks/student/grades.js';
 import { studentProfile } from '../mocks/student/profile.js';
 import { studentStore } from '../mocks/student/store.js';
 import { subjects, subjectsByCode } from '../mocks/student/subjects.js';
 import { tasks } from '../mocks/student/tasks.js';
+import { formatAcademicYear, formatTerm } from '../utils/academic.js';
 import { atTime, WEEKDAYS } from '../utils/dates.js';
+import { getErrorMessage } from '../utils/errors.js';
 import { formatTimeRange } from '../utils/format.js';
+import { tokenStorage } from '../utils/tokenStorage.js';
+import { api, unwrap } from './api.js';
 
 export { summarizeAttendance, ATTENDANCE_STATUSES } from '../mocks/student/attendance.js';
 export { SEMESTER_START, TODAY } from '../mocks/student/calendar.js';
@@ -32,65 +35,47 @@ export class NotFoundError extends Error {
 }
 
 const sum = (items, pick) => items.reduce((total, item) => total + pick(item), 0);
-const round2 = (value) => Math.round(value * 100) / 100;
 const byDateDesc = (key) => (a, b) => new Date(b[key]) - new Date(a[key]);
 
-// ─── Grades ────────────────────────────────────────────────────────────────
+// ─── Grades (real API) ─────────────────────────────────────────────────────
 
-export function computeRating({ prelim, midterm, final }) {
-  if (prelim == null || midterm == null || final == null) return null;
-  return Math.round(
-    prelim * GRADE_WEIGHTS.prelim + midterm * GRADE_WEIGHTS.midterm + final * GRADE_WEIGHTS.final,
-  );
-}
+const GRADE_CACHE_MS = 30_000;
+let gradeCache = null; // { token, at, promise }
 
-export const gradePoint = (rating) => GRADING_SCALE.find((step) => rating >= step.min).point;
-
-const weightedAverage = (rows) => round2(sum(rows, (r) => r.point * r.units) / sum(rows, (r) => r.units));
-
-function buildTerm(term) {
-  const rows = term.subjects.map((subject) => {
-    const rating = computeRating(subject);
-    const point = rating == null ? null : gradePoint(rating);
-    const remarks = rating == null ? 'In Progress' : point <= 3 ? 'Passed' : 'Failed';
-    return { ...subject, rating, point, remarks };
-  });
-  const complete = rows.every((row) => row.rating != null);
-
+function toGradeReport(report) {
+  const previous = report.summary.previousTerm;
   return {
-    ...term,
-    label: `${term.semester}, A.Y. ${term.academicYear}`,
-    rows,
-    complete,
-    units: sum(rows, (row) => row.units),
-    gwa: complete ? weightedAverage(rows) : null,
+    terms: report.terms.map((term) => ({ ...term, label: formatTerm(term), academicYear: formatAcademicYear(term.academicYear) })),
+    currentTermId: report.currentTermId,
+    scale: report.scale,
+    weights: report.defaultPeriodWeights,
+    summary: { ...report.summary, previousTermLabel: previous ? formatTerm(previous) : null },
   };
 }
 
+/**
+ * The signed-in student's grades, computed by the API from the scores their
+ * teachers record. Cached briefly so the dashboard, search, and subject pages
+ * don't each refetch it.
+ */
 export function getGrades() {
-  const builtTerms = terms.map(buildTerm);
-  const completed = builtTerms.filter((term) => term.complete);
-  const completedRows = completed.flatMap((term) => term.rows);
-  const passedRows = completedRows.filter((row) => row.remarks === 'Passed');
-
-  return {
-    terms: builtTerms,
-    currentTermId: CURRENT_TERM.id,
-    scale: GRADING_SCALE,
-    weights: GRADE_WEIGHTS,
-    summary: {
-      currentGpa: weightedAverage(completedRows),
-      previousGpa: completed.at(-1)?.gwa ?? null,
-      previousTermLabel: completed.at(-1)?.label ?? null,
-      totalUnits: sum(passedRows, (row) => row.units),
-      passed: passedRows.length,
-      failed: completedRows.length - passedRows.length,
-    },
-  };
+  const token = tokenStorage.get();
+  if (!gradeCache || gradeCache.token !== token || Date.now() - gradeCache.at > GRADE_CACHE_MS) {
+    const promise = api
+      .get('/students/me/grades')
+      .then((response) => toGradeReport(unwrap(response)))
+      .catch((error) => {
+        if (gradeCache?.promise === promise) gradeCache = null;
+        throw new Error(getErrorMessage(error, 'Unable to load your grades.'));
+      });
+    gradeCache = { token, at: Date.now(), promise };
+  }
+  return gradeCache.promise;
 }
 
-function currentTermRows() {
-  return buildTerm(terms.find((term) => term.id === CURRENT_TERM.id)).rows;
+async function currentTermRows() {
+  const report = await getGrades();
+  return report.terms.find((term) => term.id === report.currentTermId)?.rows ?? [];
 }
 
 // ─── Schedule & attendance ────────────────────────────────────────────────
@@ -143,13 +128,11 @@ export function getAttendance() {
 
 export function getSubjects() {
   const { bySubject } = getAttendance();
-  const grades = currentTermRows();
 
   return subjects.map((subject) => ({
     ...subject,
     scheduleText: scheduleText(subject),
     attendanceRate: bySubject.find((entry) => entry.subject.code === subject.code).rate,
-    prelim: grades.find((row) => row.code === subject.code)?.prelim ?? null,
   }));
 }
 
@@ -163,7 +146,7 @@ export function getSubjectsOverview() {
   };
 }
 
-export function getSubject(code) {
+export async function getSubject(code) {
   const subject = subjectsByCode[code];
   if (!subject) throw new NotFoundError(`We couldn't find a subject with the code "${code}".`);
 
@@ -173,7 +156,7 @@ export function getSubject(code) {
     subject: { ...subject, scheduleText: scheduleText(subject) },
     slots: getSchedule().filter((slot) => slot.subject.code === code),
     attendance: { summary: summarizeAttendance(records), recent: records.slice(0, 5) },
-    grade: currentTermRows().find((row) => row.code === code),
+    grade: (await currentTermRows().catch(() => [])).find((row) => row.code === code) ?? null,
     tasks: tasks
       .filter((task) => task.subjectCode === code)
       .sort((a, b) => new Date(a.dueAt) - new Date(b.dueAt)),
@@ -356,8 +339,10 @@ export async function updatePreferences(preferences) {
 
 // ─── Dashboard ────────────────────────────────────────────────────────────
 
-export function getDashboard(user) {
-  const grades = getGrades();
+export async function getDashboard(user) {
+  // The rest of the dashboard still loads if grades can't (the Grades page explains why).
+  const grades = await getGrades().catch(() => ({ summary: { currentGpa: null } }));
+  const rows = await currentTermRows().catch(() => []);
   const attendance = getAttendance();
   const finance = getFinance();
 
@@ -374,8 +359,18 @@ export function getDashboard(user) {
     },
     today: getTodaySchedule(),
     recentAttendance: attendance.records.slice(0, 5),
-    recentGrades: currentTermRows()
-      .map((row) => ({ ...row, postedAt: prelimPostedAt(row.code).toISOString(), subject: subjectsByCode[row.code] }))
+    recentGrades: rows
+      .filter((row) => row.lastScoredAt)
+      .map((row) => {
+        const latestPeriod = ['final', 'midterm', 'prelim'].find((period) => row[period] != null);
+        return {
+          ...row,
+          latestPeriod,
+          latestGrade: row[latestPeriod],
+          postedAt: row.lastScoredAt,
+          subject: subjectsByCode[row.code] ?? { code: row.code, name: row.name, color: '#64748b' },
+        };
+      })
       .sort(byDateDesc('postedAt'))
       .slice(0, 5),
     announcements: getAnnouncements().slice(0, 3),
@@ -385,8 +380,12 @@ export function getDashboard(user) {
 
 // ─── Global search ────────────────────────────────────────────────────────
 
-function buildSearchIndex() {
-  const { terms: gradeTerms } = getGrades();
+async function buildSearchIndex() {
+  // Search still works (without grades) if the grades request fails.
+  const gradeTerms = await getGrades().then(
+    (report) => report.terms,
+    () => [],
+  );
   const { requests, catalog } = getDocuments();
 
   return [
@@ -403,7 +402,13 @@ function buildSearchIndex() {
         id: `grade-${term.id}-${row.code}`,
         group: 'Grades',
         title: `${row.code} — ${row.name}`,
-        subtitle: `${term.label} · ${row.rating != null ? `Final rating ${row.rating} (${row.point.toFixed(2)})` : `Prelim ${row.prelim}`}`,
+        subtitle: `${term.label} · ${
+          row.rating != null
+            ? `Final rating ${row.rating} (${row.point.toFixed(2)})`
+            : row.prelim != null
+              ? `Prelim ${Math.round(row.prelim)}`
+              : 'No grades yet'
+        }`,
         to: `/student/grades?term=${term.id}`,
         text: `${row.code} ${row.name} grade ${term.academicYear} ${term.semester}`,
       })),
@@ -440,11 +445,11 @@ function buildSearchIndex() {
 export const SEARCH_GROUPS = ['Subjects', 'Grades', 'Announcements', 'Documents', 'Notifications'];
 
 /** Every word of the query must appear somewhere in the result. */
-export function search(query, perGroup = 5) {
+export async function search(query, perGroup = 5) {
   const words = query.toLowerCase().split(/\s+/).filter(Boolean);
   if (words.length === 0) return [];
 
-  const matches = buildSearchIndex().filter((item) => {
+  const matches = (await buildSearchIndex()).filter((item) => {
     const text = item.text.toLowerCase();
     return words.every((word) => text.includes(word));
   });

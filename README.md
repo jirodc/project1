@@ -19,8 +19,8 @@ server/   Express REST API — the only thing that talks to MongoDB
 | ----- | ------------------------------------------------------------- | ----------- |
 | 1     | Project setup, environment config, API connection             | ✅ Done     |
 | 2     | Authentication, password hashing, JWT, RBAC, protected routes | ✅ Done     |
-| 3     | Admin dashboard and CRUD (users, students, classrooms, …)     | Not started |
-| 4     | Teacher modules (classrooms, students, schedule, assessments, scores) | Not started |
+| 3     | Admin dashboard and CRUD (users, students, classrooms, …)     | Done except competencies and schedules |
+| 4     | Teacher modules (classrooms, students, schedule, assessments, scores) | Classrooms, students, and scores done |
 | 5     | Salary configuration and calculation                          | Not started |
 | 6     | Security hardening                                            | Partly done (see below) |
 | 7     | Testing                                                       | Auth covered |
@@ -32,7 +32,17 @@ Sidebar links for modules that are not built yet open a "Not built yet" page.
 
 Students sign in to `/student`: dashboard, attendance, grades, subjects, schedule, announcements, finance, documents, notifications and profile, plus global search (Ctrl K) and a notification bell.
 
-Apart from sign-in and **Change password** (real API calls), the portal runs on **mock data** in `client/src/mocks/student/`, accessed only through `client/src/services/student.service.js`. Replacing that service's functions with API calls is all it takes to connect a real backend. Changes a student makes (profile edits, document requests, read notifications, photo) are kept in the browser's `localStorage`. Downloadable documents are generated PDFs marked as samples.
+**Grades are real**: they are computed by the API from the scores teachers record (`GET /api/students/me/grades`). The other sections (attendance, schedule, finance, documents, notifications) still run on **mock data** in `client/src/mocks/student/`, accessed only through `client/src/services/student.service.js`. Replacing that service's functions with API calls is all it takes to connect them.
+
+### How grades are computed
+
+Each **subject** has its own grading weights, set by admins on the Subjects page and used by every class of that subject in every semester:
+
+- **Category weights** (Quiz, Assignment, Project, Examination, Participation, Other; total 100%) combine scores *within* a grading period. Scores in a category are pooled (total score ÷ total maximum). Categories with no scores yet are left out and the remaining weights re-normalized, so a missing quiz doesn't count as zero.
+- **Period weights** (Prelim, Midterm, Final; total 100%) combine the three period grades into the **final rating**, which appears once all three have scores.
+- The rating maps to the 1.00–5.00 grade point scale (75 = 3.00 passing). GWA is the unit-weighted average of grade points over completed semesters.
+
+The logic lives in `server/src/services/grading.service.js` (unit-tested in `server/tests/grading.test.js`). Changes a student makes (profile edits, document requests, read notifications, photo) are kept in the browser's `localStorage`. Downloadable documents are generated PDFs marked as samples.
 
 ## Getting started
 
@@ -62,7 +72,8 @@ In Atlas, also allow your IP under **Network Access**.
 # API — http://localhost:5050/api
 cd server
 npm install
-npm run seed    # creates the admin (and demo teacher) from SEED_* values; safe to re-run
+npm run seed    # creates the admin (and demo teacher/student) from SEED_* values; safe to re-run
+npm run seed:demo  # optional: subjects, faculty, classmates, 5 semesters of classes and scores; runs once
 npm run dev
 
 # Client — http://localhost:5173 (in a second terminal)
@@ -137,6 +148,18 @@ Authenticated requests send `Authorization: Bearer <token>`.
 | GET    | `/api/auth/me`       | Signed in     | Current user                                           |
 | POST   | `/api/auth/logout`   | Signed in     | Records the sign-out; the client discards the token    |
 | POST   | `/api/auth/change-password` | Signed in | `{ currentPassword, newPassword }`. Shares the login rate limit |
+
+Academic modules (lists accept `?page&limit&search` plus the filters shown; `DELETE` deactivates, it never removes):
+
+| Endpoints | Access | Notes |
+| --------- | ------ | ----- |
+| `/api/users` (`GET`, `POST`, `GET/PUT/DELETE /:id`, `POST /:id/reset-password`) | Admin | Filters `role`, `status`. Admins can't deactivate themselves or the last active admin. |
+| `/api/subjects` (+ `/:id`) | Read: admin, teacher · Write: admin | Includes `grading` weights, validated to total 100%. |
+| `/api/students` (+ `/:id`, `/lookup?search=`) | Read: admin, teacher · Write: admin | Creating a student also creates their login. Teachers only see students in their classes. |
+| `/api/students/me`, `/api/students/me/grades` | Student | The signed-in student's record and computed grade report. |
+| `/api/classrooms` (+ `/:id`, `/:id/gradebook`, `PUT /:id/students`) | Read and class list: admin, class teacher · Other writes: admin | Teachers only ever see their own classes; others return 404. |
+| `/api/scores` (`GET ?classroomId=`, `POST`, `PUT/DELETE /:id`) | Admin, class teacher | Students must be enrolled; score can't exceed the maximum. |
+| `/api/dashboard/admin`, `/api/activity-logs` | Admin | Counts and the audit trail. |
 | POST   | `/api/auth/register` | Admin only    | Create an account `{ firstName, lastName, email, password, role?, status? }` |
 
 ### Authentication and authorization

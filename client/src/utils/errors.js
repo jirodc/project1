@@ -12,3 +12,14 @@ export function getErrorMessage(error, fallback = 'Something went wrong. Please 
   }
   return fallback;
 }
+
+/**
+ * Puts the API's field-level validation messages onto a React Hook Form.
+ * Returns true when at least one field error was applied.
+ */
+export function applyFieldErrors(error, setError) {
+  const details = error?.response?.data?.details;
+  if (!details?.length) return false;
+  details.forEach(({ field, message }) => setError(field, { message }));
+  return true;
+}

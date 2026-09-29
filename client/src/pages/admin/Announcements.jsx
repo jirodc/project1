@@ -5,18 +5,20 @@ import { useForm } from 'react-hook-form';
 import toast from 'react-hot-toast';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { z } from 'zod';
-import Alert from '../../components/common/Alert.jsx';
+import AnnouncementViewer, { AuthorAvatar, authorName } from '../../components/announcements/AnnouncementViewer.jsx';
+import Badge from '../../components/common/Badge.jsx';
 import Button from '../../components/common/Button.jsx';
+import Card, { CardHeader } from '../../components/common/Card.jsx';
 import ConfirmDialog from '../../components/common/ConfirmDialog.jsx';
 import Modal from '../../components/common/Modal.jsx';
 import PageHeader from '../../components/common/PageHeader.jsx';
 import Pagination from '../../components/common/Pagination.jsx';
-import Spinner from '../../components/common/Spinner.jsx';
+import { EmptyState, ErrorState, LoadingState } from '../../components/common/States.jsx';
 import TextField, { TextAreaField } from '../../components/common/TextField.jsx';
 import { useAnnouncements } from '../../hooks/useAnnouncements.js';
 import { announcementService } from '../../services/announcement.service.js';
 import { getErrorMessage } from '../../utils/errors.js';
-import { formatDateTime } from '../../utils/format.js';
+import { formatDate } from '../../utils/format.js';
 
 // Keep in sync with ANNOUNCEMENT_LIMITS in server/src/models/Announcement.js.
 const LIMITS = { title: 120, body: 2000, type: 30 };
@@ -44,6 +46,7 @@ export default function Announcements() {
   const [isFormOpen, setIsFormOpen] = useState(Boolean(location.state?.openCreate));
   const [pendingAnnouncement, setPendingAnnouncement] = useState(null);
   const [isPublishing, setIsPublishing] = useState(false);
+  const [openIndex, setOpenIndex] = useState(null);
 
   const {
     register,
@@ -89,7 +92,7 @@ export default function Announcements() {
     <>
       <PageHeader
         title="Announcements"
-        description="Create announcements and review the ones already published."
+        description="Create announcements and read the ones already published."
         actions={
           <Button onClick={openForm}>
             <Plus className="size-4" aria-hidden="true" />
@@ -98,7 +101,9 @@ export default function Announcements() {
         }
       />
 
-      <AnnouncementList list={list} onRetry={list.reload} onCreate={openForm} onPageChange={list.setPage} />
+      <AnnouncementList list={list} onRetry={list.reload} onCreate={openForm} onPageChange={list.setPage} onOpen={setOpenIndex} />
+
+      <AnnouncementViewer items={list.items} index={openIndex} onNavigate={setOpenIndex} onClose={() => setOpenIndex(null)} />
 
       <Modal
         open={isFormOpen}
@@ -176,80 +181,69 @@ export default function Announcements() {
   );
 }
 
-function AnnouncementList({ list, onRetry, onCreate, onPageChange }) {
+const timeFormat = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit' });
+const dayFormat = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' });
+
+/** Inbox-style date: time for today, "Sep 28" this year, full date otherwise. */
+function inboxDate(value) {
+  const date = new Date(value);
+  const now = new Date();
+  if (date.toDateString() === now.toDateString()) return timeFormat.format(date);
+  if (date.getFullYear() === now.getFullYear()) return dayFormat.format(date);
+  return formatDate(date);
+}
+
+function AnnouncementList({ list, onRetry, onCreate, onPageChange, onOpen }) {
   const { status, items, pagination, error } = list;
 
-  if (status === 'error') {
-    return (
-      <div className="space-y-3">
-        <Alert tone="error">{error}</Alert>
-        <Button variant="secondary" onClick={onRetry}>
-          Try again
-        </Button>
-      </div>
-    );
-  }
-
-  if (status === 'loading' && items.length === 0) {
-    return (
-      <div className="flex justify-center rounded-xl border border-slate-200 bg-white py-16 text-indigo-600">
-        <Spinner className="size-6" />
-        <span className="sr-only">Loading announcements…</span>
-      </div>
-    );
-  }
+  if (status === 'error') return <ErrorState message={error} onRetry={onRetry} />;
+  if (status === 'loading' && items.length === 0) return <LoadingState label="Loading announcements…" />;
 
   if (items.length === 0) {
     return (
-      <div className="flex flex-col items-center rounded-xl border border-dashed border-slate-300 bg-white px-6 py-16 text-center">
-        <span className="flex size-12 items-center justify-center rounded-full bg-indigo-50 text-indigo-600">
-          <Megaphone className="size-6" aria-hidden="true" />
-        </span>
-        <h2 className="mt-4 font-semibold text-slate-900">No announcements yet</h2>
-        <p className="mt-1 text-sm text-slate-600">Announcements you create will be listed here.</p>
-        <Button className="mt-5" onClick={onCreate}>
-          <Plus className="size-4" aria-hidden="true" />
-          Create Announcement
-        </Button>
-      </div>
+      <EmptyState
+        icon={Megaphone}
+        title="No announcements yet"
+        description="Announcements you create will be listed here."
+        action={
+          <Button onClick={onCreate}>
+            <Plus className="size-4" aria-hidden="true" />
+            Create Announcement
+          </Button>
+        }
+      />
     );
   }
 
   return (
-    <div className={`overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs transition-opacity ${status === 'loading' ? 'opacity-60' : ''}`}>
-      <h2 className="border-b border-slate-200 px-5 py-3 text-sm font-semibold text-slate-900">
-        List of Created Announcements
-      </h2>
-      <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-slate-200 text-sm">
-          <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">
-            <tr>
-              <th scope="col" className="px-5 py-3">Title</th>
-              <th scope="col" className="px-5 py-3">Type</th>
-              <th scope="col" className="whitespace-nowrap px-5 py-3">Creation Date</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {items.map((announcement) => (
-              <tr key={announcement.id} className="align-top hover:bg-slate-50">
-                <td className="max-w-md px-5 py-3.5">
-                  <p className="font-medium text-slate-900">{announcement.title}</p>
-                  <p className="mt-0.5 line-clamp-1 text-slate-500">{announcement.body}</p>
-                </td>
-                <td className="px-5 py-3.5">
-                  <span className="inline-flex whitespace-nowrap rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-medium text-indigo-700">
-                    {announcement.type}
-                  </span>
-                </td>
-                <td className="whitespace-nowrap px-5 py-3.5 text-slate-600">
-                  <time dateTime={announcement.createdAt}>{formatDateTime(announcement.createdAt)}</time>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
+    <Card className={`overflow-hidden transition-opacity ${status === 'loading' ? 'opacity-60' : ''}`}>
+      <CardHeader title="List of Created Announcements" description="Select an announcement to read it in full." />
+      <ul className="divide-y divide-slate-100">
+        {items.map((announcement, index) => (
+          <li key={announcement.id}>
+            <button
+              type="button"
+              onClick={() => onOpen(index)}
+              className="group relative flex w-full items-center gap-4 px-5 py-4 text-left transition hover:bg-slate-50 focus-visible:bg-indigo-50/60 focus-visible:outline-none sm:py-5"
+            >
+              <span className="absolute inset-y-0 left-0 w-1 bg-indigo-500 opacity-0 transition group-hover:opacity-100 group-focus-visible:opacity-100" aria-hidden="true" />
+              <AuthorAvatar announcement={announcement} />
+              <span className="min-w-0 flex-1">
+                <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                  <span className="truncate text-base font-semibold text-slate-900">{announcement.title}</span>
+                  <Badge tone="indigo">{announcement.type}</Badge>
+                </span>
+                <span className="mt-1 block truncate text-sm text-slate-600">
+                  <span className="font-medium text-slate-700">{authorName(announcement)}</span> — {announcement.body}
+                </span>
+              </span>
+              <time dateTime={announcement.createdAt} className="shrink-0 self-start pt-0.5 text-sm font-medium text-slate-700">
+                {inboxDate(announcement.createdAt)}
+              </time>
+            </button>
+          </li>
+        ))}
+      </ul>
       <Pagination
         className="border-t border-slate-200 px-5 py-3"
         pagination={pagination}
@@ -257,6 +251,6 @@ function AnnouncementList({ list, onRetry, onCreate, onPageChange }) {
         disabled={status === 'loading'}
         onPageChange={onPageChange}
       />
-    </div>
+    </Card>
   );
 }

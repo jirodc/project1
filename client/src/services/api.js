@@ -15,6 +15,13 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+/** Drops empty filter values so `?role=` isn't sent (the API would reject it). */
+export const cleanParams = (params) =>
+  Object.fromEntries(Object.entries(params).filter(([, value]) => value !== '' && value != null));
+
+/** Unwraps the `{ success, message, data }` envelope. */
+export const unwrap = (response) => response.data.data;
+
 let unauthorizedHandler = null;
 
 /** Registers what to do when the API rejects the stored token. Returns an unsubscribe function. */

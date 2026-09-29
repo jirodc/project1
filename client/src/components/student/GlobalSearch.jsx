@@ -1,5 +1,5 @@
 import { CornerDownLeft, Search } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { search } from '../../services/student.service.js';
 import Modal from '../common/Modal.jsx';
@@ -16,9 +16,20 @@ export default function GlobalSearch() {
   const [query, setQuery] = useState('');
   const [activeIndex, setActiveIndex] = useState(0);
 
-  // Recomputed when the dialog opens so notifications and requests are current.
-  const groups = useMemo(() => (open ? search(query) : []), [open, query]);
+  const [groups, setGroups] = useState([]);
   const results = groups.flatMap((group) => group.items);
+
+  // Rerun on each keystroke while open so notifications and requests are current.
+  useEffect(() => {
+    if (!open) return undefined;
+    let cancelled = false;
+    search(query).then((found) => {
+      if (!cancelled) setGroups(found);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, query]);
 
   useEffect(() => {
     const openOnShortcut = (event) => {

@@ -8,6 +8,7 @@ import StatusBadge, { ImportantBadge } from '../../components/student/StatusBadg
 import { SubjectDot } from '../../components/student/SubjectTag.jsx';
 import { useStudentData } from '../../hooks/useStudentData.js';
 import { getSubject, NotFoundError, TODAY } from '../../services/student.service.js';
+import { formatGrade } from '../../utils/academic.js';
 import { formatDate, formatDaysUntil, formatRelativeTime, formatShortDate, formatTimeRange } from '../../utils/format.js';
 
 function BackLink() {
@@ -139,30 +140,36 @@ function SubjectContent({ data }) {
         <Card>
           <CardHeader title="Current Grade" action={<CardLink to="/student/grades">All grades</CardLink>} />
           <CardBody>
-            <dl className="divide-y divide-slate-100 text-sm">
-              {[
-                ['Prelim', grade.prelim],
-                ['Midterm', grade.midterm],
-                ['Final', grade.final],
-              ].map(([label, value]) => (
-                <div key={label} className="flex items-center justify-between py-2.5">
-                  <dt className="text-slate-600">{label}</dt>
-                  <dd className={value == null ? 'text-slate-600' : 'text-lg font-semibold tabular-nums text-slate-900'}>
-                    {value ?? 'Not yet posted'}
+            {!grade ? (
+              <p className="text-sm text-slate-600">No grades have been recorded for this subject yet.</p>
+            ) : (
+              <dl className="divide-y divide-slate-100 text-sm">
+                {[
+                  ['Prelim', grade.prelim],
+                  ['Midterm', grade.midterm],
+                  ['Final', grade.final],
+                ].map(([label, value]) => (
+                  <div key={label} className="flex items-center justify-between py-2.5">
+                    <dt className="text-slate-600">{label}</dt>
+                    <dd className={value == null ? 'text-slate-600' : 'text-lg font-semibold tabular-nums text-slate-900'}>
+                      {value == null ? 'Not yet posted' : formatGrade(value)}
+                    </dd>
+                  </div>
+                ))}
+                <div className="flex items-center justify-between py-2.5">
+                  <dt className="font-medium text-slate-900">Final rating</dt>
+                  <dd>
+                    {grade.rating == null ? (
+                      <StatusBadge kind="grade" status="In Progress" />
+                    ) : (
+                      <span className="text-lg font-semibold">
+                        {grade.rating} ({grade.point.toFixed(2)})
+                      </span>
+                    )}
                   </dd>
                 </div>
-              ))}
-              <div className="flex items-center justify-between py-2.5">
-                <dt className="font-medium text-slate-900">Final rating</dt>
-                <dd>
-                  {grade.rating == null ? (
-                    <StatusBadge kind="grade" status="In Progress" />
-                  ) : (
-                    <span className="text-lg font-semibold">{grade.rating}</span>
-                  )}
-                </dd>
-              </div>
-            </dl>
+              </dl>
+            )}
           </CardBody>
         </Card>
       </div>
